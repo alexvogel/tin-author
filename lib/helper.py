@@ -165,4 +165,3 @@ def sample(checkpoint, n_samples, lstm_size, vocab_to_int, int_to_vocab, vocab, 
             samples.append(int_to_vocab[c])
         
     return ''.join(samples)
-

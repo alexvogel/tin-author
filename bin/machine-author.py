@@ -1,6 +1,7 @@
 import sys
 import os
 import time
+import re
 import argparse
 from subprocess import call
 
@@ -10,57 +11,65 @@ import tensorflow as tf
 sys.path.insert(0, os.path.dirname(os.path.realpath(__file__))+"/../lib")
 from helper import *
 
-version = "1.0"
-date = "2017-03-11"
+version = "1.1"
+date = "2017-05-30"
 
 # Definieren der Kommandozeilenparameter
 parser = argparse.ArgumentParser(description='machine author trains on existent books and generates sample text',
                                  epilog='author: alexander.vogel@prozesskraft.de | version: ' + version + ' | date: ' + date)
-parser.add_argument('--book', action='append', metavar='PATH',
-                   help='books for training')
+parser.add_argument('--book', action='store', metavar='STRING', default=False,
+                   help='book to train on or sample from')
 parser.add_argument('--action', metavar='train|sample|list', action='store', default='sample', required=True,
                    help='choose an action. list: lists all available book files. train: training the network (RNN) on books. sample: network creates text samples')
 
 args = parser.parse_args()
-
-# creating directory for checkpoints if not exist
-dircheckpoints = "checkpoints"
-if not os.path.exists(dircheckpoints):
-    os.makedirs(dircheckpoints)
 
 # location of books
 bookDir = os.path.dirname(os.path.realpath(__file__)) + '/../books' 
 log('info', 'using book dir ' + bookDir)
 #bookFiles = ['goethe_faust-teil1.txt', 'goethe_faust-teil2.txt']
 
+# location of trained models
+modelDir = os.path.dirname(os.path.realpath(__file__)) + '/../trained'
+log('info', 'using model dir ' + modelDir)
+
 if(args.action == 'list'):
+    print("books:")
+    print("------")
     print("\n".join(os.listdir(bookDir)))
+    print("======")
+    print("pretrained models:")
+    print("------")
+    print("\n".join(os.listdir(modelDir)))
     sys.exit(0)
 
 if(args.action == 'train' or args.action == 'sample'):
-    if len(args.book) == 0:
-        print("sample and train need at least one --book")
+    if not args.book:
+        print("sample and train need a --book")
         sys.exit(1)
 
-# temp file for concatenated books
-textfile = 'traintext.txt' 
-textfileabs = os.getcwd() + "/" + textfile
+## temp file for concatenated books
+#textfile = 'traintext.txt' 
+#textfileabs = os.getcwd() + "/" + textfile
 
-# Merge all books in 1 file
-with open(textfile, 'w') as outfile:
-    log('info', 'concatinating books in a text file: ' + textfile)
-    for fname in args.book:
-        with open(bookDir+"/"+fname, "r", encoding='utf-8', errors='ignore') as infile:
-            log('info', '   - ' + fname)
-            outfile.write(infile.read())
+## Merge all books in 1 file
+#with open(textfile, 'w') as outfile:
+#    log('info', 'concatinating books in a text file: ' + textfile)
+#    for fname in args.book:
+#        with open(bookDir+"/"+fname, "r", encoding='utf-8', errors='ignore') as infile:
+#            log('info', '   - ' + fname)
+#            outfile.write(infile.read())
+
+# define checkpoints directory for current book selection
+
 
 # load text file
-log('info', 'loading text file: ' + textfile)
-with open(textfile, 'r') as f:
+log('info', 'loading text file: ' + bookDir+"/"+args.book)
+with open(bookDir+"/"+args.book, 'r') as f:
     text=f.read()
     
 # convert text into integers
-log('info', 'converting text into integers: ' + textfile)
+log('info', 'converting text into integers: ' + bookDir+"/"+args.book)
 vocab = set(text)
 vocab_to_int = {c: i for i, c in enumerate(vocab)}
 int_to_vocab = dict(enumerate(vocab))
@@ -69,16 +78,28 @@ chars = np.array([vocab_to_int[c] for c in text], dtype=np.int32)
 log('info', 'defining hyperparameters')
 batch_size = 100
 num_steps = 100 
-lstm_size = 512
+lstm_size = 1024
 num_layers = 2
 learning_rate = 0.001
 keep_prob = 0.5
 
 if args.action == 'sample':
-    print("loading checkpoint")
-    tf.train.get_checkpoint_state('checkpoints')
-    checkpoint = "checkpoints/i960_l512_v1.599.ckpt"
-    samp = sample(checkpoint, 2000, lstm_size, vocab_to_int, int_to_vocab, vocab, prime="Far")
+    log('info', "loading checkpoint for book " + args.book)
+    tf.train.get_checkpoint_state('trained/'+args.book)
+#    checkpoint = "checkpoints/i960_l512_v1.599.ckpt"
+
+    checkpoint = "trained/"+args.book+"/checkpoint.ckpt"
+    
+    myPrime = None
+    m = re.search('^d_', args.book)
+    if m:
+        myPrime = "Die "
+    else:
+    	myPrime = "The True"
+    
+    log('info', 'using prime: ' + myPrime)
+    
+    samp = sample(checkpoint, 2000, lstm_size, vocab_to_int, int_to_vocab, vocab, prime='The True')
     print(samp)
     sys.exit(0)
     
